@@ -6,9 +6,19 @@ Sets up a new machine with my usual tools, then pulls my dotfiles with chezmoi.
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/kimusan/bootstrap/main/bootstrap.sh)"
 ```
 
-Use `bash -c "$(curl ...)"`, not `curl ... | bash`: chezmoi asks for the age passphrase and `chsh` asks for your password, and both need the terminal.
+Use `bash -c "$(curl ...)"`, not `curl ... | bash`: chezmoi asks once for the age passphrase and `chsh` asks for your password, and both need the terminal.
 
 Needs a GitHub SSH key on the machine first, since the dotfiles repo is private. Safe to re-run; anything already installed is skipped.
+
+## Encrypted dotfiles
+
+A few dotfiles are encrypted with [age](https://age-encryption.org): `config.fish`, `.git-credentials`, `~/.bin/wtf` and the ChatGPT token. They're encrypted to an age key pair, not to a passphrase, so chezmoi decrypts them without prompting.
+
+- The private key lives in the dotfiles repo as `key.txt.age`, protected by the passphrase. That's the only passphrase-encrypted file.
+- On first `chezmoi init --apply`, the repo's `run_onchange_before_decrypt-private-key.sh` asks for the passphrase once and writes the key to `~/.config/chezmoi/key.txt` (mode 600). It does nothing on later runs.
+- The age settings (identity file and public key) come from the repo's `.chezmoi.toml.tmpl`, so a new machine gets them on `chezmoi init`.
+
+To encrypt another file: `chezmoi add --encrypt <file>`. To change an encrypted file: `chezmoi edit --apply <file>`. Neither asks for the passphrase once the key is in place.
 
 ## What it installs
 
