@@ -10,6 +10,14 @@ Use `bash -c "$(curl ...)"`, not `curl ... | bash`: chezmoi asks once for the ag
 
 Needs a GitHub SSH key on the machine first, since the dotfiles repo is private. Safe to re-run; anything already installed is skipped.
 
+It asks for your sudo password once at the start, then shows one line per step with a spinner and a ✓ when it's done. Installer output goes to `~/.local/state/bootstrap/bootstrap-<date>.log` instead of the screen. If a step fails, you see its last 15 lines and the log path; a step that's allowed to fail (fisher, omf, nvm, Lazy sync) is listed as a warning at the end instead of stopping the run. Steps that need you (the chezmoi passphrase, `chsh`) run in the open.
+
+To see all output on screen as well, run it with `VERBOSE=1`:
+
+```bash
+VERBOSE=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/kimusan/bootstrap/main/bootstrap.sh)"
+```
+
 ## Encrypted dotfiles
 
 A few dotfiles are encrypted with [age](https://age-encryption.org): `config.fish`, `.git-credentials`, `~/.bin/wtf` and the ChatGPT token. They're encrypted to an age key pair, not to a passphrase, so chezmoi decrypts them without prompting.
