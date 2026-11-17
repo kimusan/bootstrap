@@ -19,6 +19,8 @@ APT_PACKAGES=(
   autojump grc age
   python3-pip python3-venv python3-poetry
   tmux
+  # lf previews: pdf, 7z/rar, file metadata, images (kitten ships with kitty)
+  poppler-utils p7zip-full libimage-exiftool-perl kitty
 )
 BREW_ON_UBUNTU=(zellij lazygit)
 
@@ -28,6 +30,8 @@ BREW_PACKAGES=(
   fzf ripgrep fd bat eza jq lf tig tree cowsay
   autojump grc age poetry
   tmux zellij lazygit
+  # lf previews (no kitten here: on macOS install the kitty app for image previews)
+  poppler p7zip exiftool
 )
 
 log()  { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
