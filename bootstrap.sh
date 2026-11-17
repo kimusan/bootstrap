@@ -150,6 +150,15 @@ setup_fish() {
   fish -c 'omf install' || warn "omf install failed"
   fish -c 'nvm install latest' || warn "nvm install failed"
 
+  # Older setups: tmux-zen started tmux on every shell, Zellij replaces it.
+  if fish -c 'omf list' 2>/dev/null | grep -qw tmux-zen; then
+    log "Removing tmux-zen (Zellij replaces it)"
+    fish -c 'omf remove tmux-zen' || warn "omf remove tmux-zen failed"
+  fi
+  # PATH lives in conf.d/paths.fish now; an old universal fish_user_paths
+  # can hold another machine's home paths.
+  fish -c 'set -q fish_user_paths; and set -Ue fish_user_paths' || true
+
   local fish_path
   fish_path="$(command -v fish)"
   local login_shell
@@ -178,6 +187,8 @@ main() {
   setup_fish
   setup_nvim
   log "Done. Open a new terminal to start fish and Zellij."
+  echo "Zellij asks once for plugin permissions (zjstatus, zellij-attention): press y in each prompt."
+  echo "If Zellij was already running, restart it so the new config and plugins load."
 }
 
 main "$@"

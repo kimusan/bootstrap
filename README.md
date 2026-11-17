@@ -89,4 +89,8 @@ On Ubuntu, packages come from apt when the archive has a usable version. Everyth
 - `fisher update`: fzf.fish, fc-fish and nvm.fish from `fish_plugins`
 - `omf install`: everything in the Oh My Fish bundle
 - `nvm install latest`: node
+- `omf remove tmux-zen` if an older setup has it (Zellij replaces it)
+- Clears the universal `fish_user_paths`; PATH comes from `conf.d/paths.fish` now
 - `nvim --headless "+Lazy! sync"`: LazyVim plugins, including the avante.nvim build
+
+On first start Zellij asks for plugin permissions for zjstatus and zellij-attention. Press `y` in each prompt; the script can't answer them for you.
