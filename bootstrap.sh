@@ -393,7 +393,31 @@ install_chezmoi_and_dotfiles() {
 
 # ---------------------------------------------------------------- fish
 
+# Homebrew's installer wires its bin dir into bash/zsh profiles only, never
+# fish, and the dotfiles' conf.d/paths.fish doesn't list it either — so on
+# Ubuntu the brew-installed tools (zellij, lazygit, gh) are invisible to
+# fish. Write a conf.d file of our own: chezmoi doesn't manage it (extra
+# files in the target directory survive `chezmoi apply`), and fish_add_path
+# skips directories that don't exist, so one file fits brew-less machines.
+# ~/.cargo/bin is already in the dotfiles' paths.fish; it's here too so
+# rust tools work even before the dotfiles are applied.
+fish_extra_paths() {
+  mkdir -p "$HOME/.config/fish/conf.d"
+  cat >"$HOME/.config/fish/conf.d/00-bootstrap-paths.fish" <<'EOF'
+# Written by bootstrap.sh: tool bin dirs not covered by conf.d/paths.fish.
+# fish_add_path skips directories that don't exist.
+fish_add_path -g \
+    /home/linuxbrew/.linuxbrew/bin \
+    /opt/homebrew/bin \
+    /usr/local/bin \
+    ~/.cargo/bin
+EOF
+}
+
 setup_fish() {
+  fish_extra_paths
+  try "fish finds the brew-installed tools (zellij, lazygit, gh)" \
+    fish -c 'command -v zellij'
   try "fisher update (fzf.fish, fc-fish, nvm.fish)" fish -c 'fisher update'
   try "omf install (Oh My Fish bundle)" fish -c 'omf install'
   try "nvm install latest (node)" fish -c 'nvm install latest'

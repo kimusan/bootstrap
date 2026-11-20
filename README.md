@@ -100,6 +100,7 @@ On Ubuntu, packages come from apt when the archive has a usable version. Everyth
 - `nvm install latest`: node
 - `omf remove tmux-zen` if an older setup has it (Zellij replaces it)
 - Clears the universal `fish_user_paths`; PATH comes from `conf.d/paths.fish` now
+- Writes `conf.d/00-bootstrap-paths.fish`: Homebrew's bin dir (Homebrew never configures fish itself) and `~/.cargo/bin`, so brew-installed tools like zellij are on fish's PATH. It's not chezmoi-managed, so `chezmoi apply` leaves it alone, and it checks that fish can find zellij
 - `nvim --headless "+Lazy! sync"`: LazyVim plugins, including the avante.nvim build
 
 On first start Zellij asks for plugin permissions for zjstatus and zellij-attention. Press `y` in each prompt; the script can't answer them for you.
