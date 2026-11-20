@@ -4,8 +4,12 @@
 #
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/kimusan/bootstrap/main/bootstrap.sh)"
 #
-# Use that form, not `curl | bash`: chezmoi asks for the age passphrase and
-# chsh asks for your password, and both need the terminal on stdin.
+# On networks that block raw.githubusercontent.com, clone and run it instead:
+#   git clone --depth 1 https://github.com/kimusan/bootstrap /tmp/bootstrap \
+#     && bash /tmp/bootstrap/bootstrap.sh
+#
+# Use the bash -c form, not `curl | bash`: chezmoi asks for the age passphrase
+# and chsh asks for your password, and both need the terminal on stdin.
 #
 # Installer output goes to a log file (path printed at start and end).
 # VERBOSE=1 shows it on screen as well.
@@ -122,6 +126,38 @@ interactive() {
   "$@"
 }
 
+# ---------------------------------------------------------------- fetch
+
+# fetch_raw URL DEST: like `curl -fsSL URL -o DEST` for a
+# raw.githubusercontent.com file, but if that is blocked, fall back to a
+# shallow clone (last commit only) of the repo behind the URL, copy the file
+# out of it, and delete the clone again.
+fetch_raw() {
+  local url=$1 dest=$2
+  # --connect-timeout: blocked networks often blackhole the connection, so
+  # don't sit through curl's long default timeout before falling back.
+  if curl -fsSL --connect-timeout 15 "$url" -o "$dest"; then
+    return 0
+  fi
+
+  # https://raw.githubusercontent.com/OWNER/REPO/REF/PATH
+  local owner repo ref path
+  [[ "$url" =~ ^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)$ ]] || return 1
+  owner=${BASH_REMATCH[1]} repo=${BASH_REMATCH[2]} ref=${BASH_REMATCH[3]} path=${BASH_REMATCH[4]}
+
+  note "raw.githubusercontent.com unreachable, cloning github.com/$owner/$repo instead"
+  local clone rc=0
+  clone="$(mktemp -d)" || return 1
+  local -a clone_args=(--quiet --depth 1)
+  if [ "$ref" != HEAD ]; then
+    clone_args+=(--branch "$ref")
+  fi
+  git clone "${clone_args[@]}" "https://github.com/$owner/$repo.git" "$clone" &&
+    cp "$clone/$path" "$dest" || rc=$?
+  rm -rf "$clone"
+  return "$rc"
+}
+
 # ---------------------------------------------------------------- setup
 
 if [ "$(id -u)" -eq 0 ]; then
@@ -157,9 +193,12 @@ brew_shellenv() {
 }
 
 install_brew() {
-  local script
-  script="$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || return
-  NONINTERACTIVE=1 /bin/bash -c "$script"
+  local tmp rc=0
+  tmp="$(mktemp)"
+  fetch_raw https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh "$tmp" &&
+    NONINTERACTIVE=1 /bin/bash "$tmp" || rc=$?
+  rm -f "$tmp"
+  return "$rc"
 }
 
 ensure_brew() {
@@ -233,8 +272,9 @@ omf_install() {
   fi
   local tmp
   tmp="$(mktemp)"
-  curl -fsSL https://raw.githubusercontent.com/oh-my-fish/oh-my-fish/master/bin/install -o "$tmp" || return
-  fish "$tmp" --noninteractive --yes || return
+  fetch_raw https://raw.githubusercontent.com/oh-my-fish/oh-my-fish/master/bin/install "$tmp" ||
+    { rm -f "$tmp"; return 1; }
+  fish "$tmp" --noninteractive --yes || { rm -f "$tmp"; return 1; }
   rm -f "$tmp"
   if [ -d "$HOME/.local/share/omf.pre-bootstrap" ]; then
     cp -rn "$HOME/.local/share/omf.pre-bootstrap/." "$HOME/.local/share/omf/"
