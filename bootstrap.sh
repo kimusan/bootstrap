@@ -126,6 +126,15 @@ interactive() {
   "$@"
 }
 
+# ask_yes PROMPT: y/n question on the terminal. Anything not starting with
+# y/Y (including a bare Enter or a failed read) means no.
+ask_yes() {
+  local answer
+  printf '  %s %s[y/N]%s ' "$*" "$C_DIM" "$C_OFF"
+  read -r answer
+  [[ "$answer" == [Yy]* ]]
+}
+
 # ---------------------------------------------------------------- fetch
 
 # fetch_raw URL DEST: like `curl -fsSL URL -o DEST` for a
@@ -335,6 +344,23 @@ fix_chezmoi_remote() {
   esac
 }
 
+# A failed chezmoi update on a machine where chezmoi ran before usually means
+# the source repo has conflicting local changes (autostash conflicts) or the
+# machine still carries a config file and age key from an earlier setup that
+# no longer match the repo's recipients ("config file template has changed",
+# "no identity matched any of the recipients"). reset_chezmoi moves all of
+# that into a timestamped backup, so a clean `chezmoi init --apply` can
+# regenerate the config, key and working tree.
+reset_chezmoi() {
+  local backup="$HOME/.local/share/chezmoi.backup-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$backup"
+  mv "$HOME/.local/share/chezmoi" "$backup/source-repo"
+  if [ -d "$HOME/.config/chezmoi" ]; then
+    mv "$HOME/.config/chezmoi" "$backup/config"
+  fi
+  note "old chezmoi state backed up in $backup"
+}
+
 install_chezmoi_and_dotfiles() {
   mkdir -p "$HOME/.bin"
   export PATH="$HOME/.bin:$PATH"
@@ -348,9 +374,14 @@ install_chezmoi_and_dotfiles() {
 
   if [ -d "$HOME/.local/share/chezmoi/.git" ]; then
     fix_chezmoi_remote
-    interactive "chezmoi update" chezmoi update || die "chezmoi update failed"
-    ok "Dotfiles updated"
-    return
+    if interactive "chezmoi update" chezmoi update; then
+      ok "Dotfiles updated"
+      return
+    fi
+    warn "chezmoi update failed (conflicting local changes, or an outdated config/age key)"
+    ask_yes "Reset chezmoi and re-apply the dotfiles from scratch? The old source repo, config and age key are backed up first" \
+      || die "chezmoi update failed. Full log: $LOG"
+    reset_chezmoi
   fi
 
   local repo_url=$DOTFILES_REPO

@@ -90,7 +90,7 @@ On Ubuntu, packages come from apt when the archive has a usable version. Everyth
 | Homebrew | brew.sh installer | For zellij and lazygit, which apt doesn't have |
 | hishtory | hishtory.dev installer | Shell history search; `config.fish` sources it. Run `hishtory init <secret>` to sync with other machines |
 | Oh My Fish | upstream installer | Theme (elderitch) and the packages in `~/.config/omf/bundle`. Installed before chezmoi, because the installer refuses to run if `~/.local/share/omf` already exists |
-| chezmoi | get.chezmoi.io, into `~/.bin` | Pulls and applies the dotfiles |
+| chezmoi | get.chezmoi.io, into `~/.bin` | Pulls and applies the dotfiles. If an update fails on old chezmoi state (conflicting local changes, outdated config/age key), it offers a from-scratch re-apply with the old state backed up |
 | gh | brew | Logs in to GitHub (one-time device code) so the private dotfiles repo clones over HTTPS |
 
 ### After the dotfiles are in place
