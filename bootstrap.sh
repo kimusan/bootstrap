@@ -298,6 +298,42 @@ chezmoi_install() {
   sh -c "$script" -- -b "$HOME/.bin"
 }
 
+# GitHub closes the ssh channel with exit 1 even when auth succeeds, so look
+# for the message, not the exit code. ConnectTimeout: don't hang for minutes
+# on networks that blackhole port 22.
+github_ssh_ok() {
+  local out
+  out="$(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 \
+    -T git@github.com 2>&1 || true)"
+  [[ "$out" == *"successfully authenticated"* ]]
+}
+
+# chezmoi update pulls the source repo, and the dotfiles repo is private: a
+# clone made over HTTPS fails with GitHub's "Password authentication is not
+# supported" unless a token sits in the git credential helper. Prefer SSH
+# like the init path does, but leave machines with a working token alone.
+fix_chezmoi_remote() {
+  local dir=$HOME/.local/share/chezmoi url repo
+  url="$(git -C "$dir" remote get-url origin 2>/dev/null || true)"
+  case "$url" in
+    https://github.com/*)
+      if github_ssh_ok; then
+        repo="${url#https://github.com/}"
+        repo="${repo%.git}"
+        git -C "$dir" remote set-url origin "git@github.com:$repo.git"
+        ok "chezmoi source repo switched to SSH" "$repo"
+      else
+        note "dotfiles repo is on HTTPS and this machine has no GitHub SSH key;"
+        note "chezmoi update needs a token in the git credential helper to pull it."
+      fi
+      ;;
+    git@github.com:*)
+      github_ssh_ok ||
+        die "No GitHub SSH access. Add this machine's SSH key to GitHub, then re-run:"
+      ;;
+  esac
+}
+
 install_chezmoi_and_dotfiles() {
   mkdir -p "$HOME/.bin"
   export PATH="$HOME/.bin:$PATH"
@@ -308,19 +344,18 @@ install_chezmoi_and_dotfiles() {
   fi
 
   if [ -d "$HOME/.local/share/chezmoi/.git" ]; then
+    fix_chezmoi_remote
     interactive "chezmoi update" chezmoi update || die "chezmoi update failed"
     ok "Dotfiles updated"
     return
   fi
 
   if [[ "$DOTFILES_REPO" == git@github.com:* ]]; then
-    local ssh_out
-    ssh_out="$(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 || true)"
-    if [[ "$ssh_out" != *"successfully authenticated"* ]]; then
+    github_ssh_ok || {
       warn "No GitHub SSH access. Add this machine's SSH key to GitHub, then re-run:"
       note "  ssh-keygen -t ed25519 && cat ~/.ssh/id_ed25519.pub"
       exit 1
-    fi
+    }
     ok "GitHub SSH access"
   fi
   interactive "chezmoi init --apply (asks once for the age key passphrase)" \
