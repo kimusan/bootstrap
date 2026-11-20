@@ -8,7 +8,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/kimusan/bootstrap/main/b
 
 Use `bash -c "$(curl ...)"`, not `curl ... | bash`: chezmoi asks once for the age passphrase and `chsh` asks for your password, and both need the terminal.
 
-Needs a GitHub SSH key on the machine first, since the dotfiles repo is private. Safe to re-run; anything already installed is skipped.
+Asks you to log in to GitHub once with `gh auth login` (it shows a one-time code you enter at github.com/login/device — no SSH key or PAT setup needed), since the dotfiles repo is private. Safe to re-run; anything already installed is skipped.
 
 It asks for your sudo password once at the start, then shows one line per step with a spinner and a ✓ when it's done. Installer output goes to `~/.local/state/bootstrap/bootstrap-<date>.log` instead of the screen. If a step fails, you see its last 15 lines and the log path; a step that's allowed to fail (fisher, omf, nvm, Lazy sync) is listed as a warning at the end instead of stopping the run. Steps that need you (the chezmoi passphrase, `chsh`) run in the open.
 
@@ -91,6 +91,7 @@ On Ubuntu, packages come from apt when the archive has a usable version. Everyth
 | hishtory | hishtory.dev installer | Shell history search; `config.fish` sources it. Run `hishtory init <secret>` to sync with other machines |
 | Oh My Fish | upstream installer | Theme (elderitch) and the packages in `~/.config/omf/bundle`. Installed before chezmoi, because the installer refuses to run if `~/.local/share/omf` already exists |
 | chezmoi | get.chezmoi.io, into `~/.bin` | Pulls and applies the dotfiles |
+| gh | brew | Logs in to GitHub (one-time device code) so the private dotfiles repo clones over HTTPS |
 
 ### After the dotfiles are in place
 

@@ -32,11 +32,11 @@ APT_PACKAGES=(
   # lf previews: pdf, 7z/rar, file metadata, images (kitten ships with kitty)
   poppler-utils p7zip-full libimage-exiftool-perl kitty
 )
-BREW_ON_UBUNTU=(zellij lazygit)
+BREW_ON_UBUNTU=(gh zellij lazygit)
 
 # Any other OS: everything from Homebrew.
 BREW_PACKAGES=(
-  fish git curl wget neovim
+  fish git gh curl wget neovim
   fzf ripgrep fd bat eza jq lf tig tree cowsay
   autojump grc age poetry
   tmux zellij lazygit
@@ -298,38 +298,39 @@ chezmoi_install() {
   sh -c "$script" -- -b "$HOME/.bin"
 }
 
-# GitHub closes the ssh channel with exit 1 even when auth succeeds, so look
-# for the message, not the exit code. ConnectTimeout: don't hang for minutes
-# on networks that blackhole port 22.
-github_ssh_ok() {
-  local out
-  out="$(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 \
-    -T git@github.com 2>&1 || true)"
-  [[ "$out" == *"successfully authenticated"* ]]
+# Authenticate to GitHub with the gh CLI: no SSH key or PAT setup needed,
+# the device flow just asks for a one-time code at github.com/login/device
+# (shown in the terminal, can be entered from any device with a browser).
+# gh auth setup-git then makes git use gh as its credential helper, so the
+# private dotfiles repo clones over HTTPS without any further setup.
+ensure_github_auth() {
+  if gh auth status >/dev/null 2>&1; then
+    skip "GitHub auth (gh)"
+  else
+    interactive "gh auth login (one-time code at github.com/login/device)" \
+      gh auth login --hostname github.com --git-protocol https --web \
+      || die "gh auth login failed"
+  fi
+  gh auth setup-git >/dev/null 2>&1 || true
 }
 
-# chezmoi update pulls the source repo, and the dotfiles repo is private: a
-# clone made over HTTPS fails with GitHub's "Password authentication is not
-# supported" unless a token sits in the git credential helper. Prefer SSH
-# like the init path does, but leave machines with a working token alone.
+# git@github.com:OWNER/REPO(.git) -> https://github.com/OWNER/REPO.git
+github_https_url() {
+  local url=$1 repo
+  repo="${url#git@github.com:}"; repo="${repo%.git}"
+  printf 'https://github.com/%s.git' "$repo"
+}
+
+# The dotfiles repo is private: git pulls it with gh's credentials, which
+# only work over HTTPS. Switch an old SSH remote (from the SSH-key days)
+# over; HTTPS remotes already work once gh auth setup-git has run.
 fix_chezmoi_remote() {
-  local dir=$HOME/.local/share/chezmoi url repo
+  local dir=$HOME/.local/share/chezmoi url
   url="$(git -C "$dir" remote get-url origin 2>/dev/null || true)"
   case "$url" in
-    https://github.com/*)
-      if github_ssh_ok; then
-        repo="${url#https://github.com/}"
-        repo="${repo%.git}"
-        git -C "$dir" remote set-url origin "git@github.com:$repo.git"
-        ok "chezmoi source repo switched to SSH" "$repo"
-      else
-        note "dotfiles repo is on HTTPS and this machine has no GitHub SSH key;"
-        note "chezmoi update needs a token in the git credential helper to pull it."
-      fi
-      ;;
     git@github.com:*)
-      github_ssh_ok ||
-        die "No GitHub SSH access. Add this machine's SSH key to GitHub, then re-run:"
+      git -C "$dir" remote set-url origin "$(github_https_url "$url")"
+      ok "chezmoi source repo switched to HTTPS" "(gh supplies the credentials)"
       ;;
   esac
 }
@@ -343,6 +344,8 @@ install_chezmoi_and_dotfiles() {
     step "Install chezmoi to ~/.bin" chezmoi_install
   fi
 
+  ensure_github_auth
+
   if [ -d "$HOME/.local/share/chezmoi/.git" ]; then
     fix_chezmoi_remote
     interactive "chezmoi update" chezmoi update || die "chezmoi update failed"
@@ -350,16 +353,10 @@ install_chezmoi_and_dotfiles() {
     return
   fi
 
-  if [[ "$DOTFILES_REPO" == git@github.com:* ]]; then
-    github_ssh_ok || {
-      warn "No GitHub SSH access. Add this machine's SSH key to GitHub, then re-run:"
-      note "  ssh-keygen -t ed25519 && cat ~/.ssh/id_ed25519.pub"
-      exit 1
-    }
-    ok "GitHub SSH access"
-  fi
+  local repo_url=$DOTFILES_REPO
+  [[ "$repo_url" == git@github.com:* ]] && repo_url="$(github_https_url "$repo_url")"
   interactive "chezmoi init --apply (asks once for the age key passphrase)" \
-    chezmoi init --apply "$DOTFILES_REPO" || die "chezmoi init failed"
+    chezmoi init --apply "$repo_url" || die "chezmoi init failed"
   ok "Dotfiles applied"
 }
 
